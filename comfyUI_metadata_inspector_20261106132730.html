@@ -1,0 +1,821 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ComfyUI Metadata Inspector v11</title>
+    <style>
+        :root {
+            --bg-blur: #1c1c1e;
+            --bg-surface: rgba(32, 32, 32, 0.85);
+            --bg-card: rgba(45, 45, 45, 0.6);
+            --border-color: rgba(255, 255, 255, 0.08);
+            --text-main: #ffffff;
+            --text-muted: #cccccc;
+            --accent: #60cdff;
+            --accent-hover: #0078d4;
+            --success: #6ccb5f;
+            --warning: #e9a942;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+        }
+
+        body {
+            background-color: #111111;
+            background-image: radial-gradient(circle at 50% 50%, #1e1e24 0%, #111111 100%);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 24px;
+            background: rgba(20, 20, 20, 0.4);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .title-area h1 {
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+
+        .badge {
+            background: rgba(108, 203, 95, 0.15);
+            color: var(--success);
+            border: 1px solid rgba(108, 203, 95, 0.3);
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .badge::before {
+            content: '';
+            display: inline-block;
+            width: 6px;
+            height: 6px;
+            background: var(--success);
+            border-radius: 50%;
+        }
+
+        main {
+            display: flex;
+            flex: 1;
+            padding: 24px;
+            gap: 24px;
+            max-width: 1600px;
+            width: 100%;
+            margin: 0 auto;
+        }
+
+        .left-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            min-width: 320px;
+            max-width: 450px;
+        }
+
+        .right-panel {
+            flex: 2;
+            display: flex;
+            flex-direction: column;
+            background: var(--bg-surface);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 24px;
+            min-height: 500px;
+        }
+
+        #drop-zone {
+            padding: 40px 20px;
+            border: 2px dashed rgba(255, 255, 255, 0.15);
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            background: rgba(255, 255, 255, 0.02);
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        #drop-zone.dragover {
+            border-color: var(--accent);
+            background: rgba(96, 205, 255, 0.05);
+        }
+
+        #drop-zone p {
+            color: var(--text-muted);
+            margin-top: 12px;
+            font-size: 0.9rem;
+        }
+
+        #preview-container {
+            display: none;
+            width: 100%;
+            border-radius: 8px;
+            overflow: hidden;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+        }
+
+        #preview-img {
+            width: 100%;
+            height: auto;
+            max-height: 350px;
+            object-fit: contain;
+            display: block;
+            background: #000;
+        }
+
+        .file-info {
+            padding: 12px;
+            font-size: 0.85rem;
+            border-top: 1px solid var(--border-color);
+            word-break: break-all;
+            color: var(--text-muted);
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .file-dimensions {
+            font-weight: 600;
+            color: var(--accent);
+            font-size: 0.9rem;
+        }
+
+        .placeholder-text {
+            color: rgba(255, 255, 255, 0.3);
+            text-align: center;
+            margin: auto;
+            font-size: 0.95rem;
+        }
+
+        .meta-section {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .group-title {
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: rgba(255, 255, 255, 0.4);
+            margin-bottom: 8px;
+            font-weight: 700;
+        }
+
+        .prompt-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 16px;
+            position: relative;
+        }
+
+        .prompt-text {
+            font-size: 0.95rem;
+            line-height: 1.5;
+            color: #e0e0e0;
+            white-space: pre-wrap;
+            margin-bottom: 35px;
+            max-height: 250px;
+            overflow-y: auto;
+        }
+
+        .copy-button-group {
+            position: absolute;
+            bottom: 12px;
+            right: 12px;
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+        }
+
+        .btn-copy {
+            position: relative;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: var(--text-main);
+            padding: 6px 14px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: all 0.15s;
+            font-weight: 500;
+        }
+
+        .btn-copy:hover {
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        .btn-copy.copied {
+            background: var(--success);
+            color: #000;
+        }
+
+        .grid-settings {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+        }
+
+        .setting-item {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 10px 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .setting-item.full-width {
+            grid-column: span 2;
+            justify-content: space-between;
+        }
+
+        .seed-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .setting-label {
+            font-size: 0.85rem;
+            color: rgba(255, 255, 255, 0.5);
+            white-space: nowrap;
+        }
+
+        .setting-value {
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: #ffffff;
+            word-break: break-all;
+        }
+
+        .inline-btn-copy {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: var(--text-main);
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            cursor: pointer;
+            transition: all 0.15s;
+            font-weight: 500;
+            white-space: nowrap;
+        }
+
+        .inline-btn-copy:hover {
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        .inline-btn-copy.copied {
+            background: var(--success);
+            color: #000;
+        }
+
+        .model-tag {
+            display: inline-block;
+            background: rgba(96, 205, 255, 0.1);
+            border: 1px solid rgba(96, 205, 255, 0.2);
+            color: var(--accent);
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            margin: 4px 4px 4px 0;
+        }
+
+        .lora-container {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .lora-item {
+            background: rgba(233, 169, 66, 0.08);
+            border: 1px solid rgba(233, 169, 66, 0.2);
+            border-radius: 6px;
+            padding: 10px 14px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .lora-name {
+            font-size: 0.9rem;
+            font-weight: 500;
+            color: #ffffff;
+            word-break: break-all;
+            padding-right: 12px;
+        }
+
+        .lora-strength {
+            font-size: 0.85rem;
+            font-weight: 700;
+            color: var(--warning);
+            background: rgba(233, 169, 66, 0.15);
+            padding: 2px 8px;
+            border-radius: 4px;
+            white-space: nowrap;
+        }
+
+        #error-msg {
+            color: #ff6b6b;
+            background: rgba(255, 107, 107, 0.1);
+            border: 1px solid rgba(255, 107, 107, 0.2);
+            padding: 12px;
+            border-radius: 6px;
+            margin-bottom: 16px;
+            display: none;
+            font-size: 0.9rem;
+        }
+
+        .raw-box {
+            background: #09090a;
+            border: 1px solid var(--border-color);
+            padding: 12px;
+            border-radius: 6px;
+            font-family: monospace;
+            font-size: 0.8rem;
+            max-height: 200px;
+            overflow-y: auto;
+            color: #a5d6ff;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="title-area">
+            <h1>ComfyUI Metadata Inspector</h1>
+        </div>
+        <div class="badge">100% Offline & Private</div>
+    </header>
+
+    <main>
+        <div class="left-panel">
+            <div id="drop-zone">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="color: var(--accent)"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                <p>Drag & Drop a ComfyUI PNG here<br><span style="font-size:0.75rem; opacity:0.6;">or click to browse</span></p>
+                <input type="file" id="file-input" accept=".png" style="display: none;">
+            </div>
+
+            <div id="preview-container">
+                <img id="preview-img" src="" alt="Preview">
+                <div class="file-info" id="file-details"></div>
+            </div>
+        </div>
+
+        <div class="right-panel">
+            <div id="error-msg"></div>
+            <div id="output-placeholder" class="placeholder-text">
+                Drop an output image from ComfyUI directly into the drop window.
+            </div>
+            <div id="meta-output" style="display: none;"></div>
+        </div>
+    </main>
+
+    <script>
+        const dropZone = document.getElementById('drop-zone');
+        const fileInput = document.getElementById('file-input');
+        const previewContainer = document.getElementById('preview-container');
+        const previewImg = document.getElementById('preview-img');
+        const fileDetails = document.getElementById('file-details');
+        const errorMsg = document.getElementById('error-msg');
+        const outputPlaceholder = document.getElementById('output-placeholder');
+        const metaOutput = document.getElementById('meta-output');
+        let currentFullJson = '';
+        let currentWorkflowJson = '';
+
+        dropZone.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', (e) => handleFiles(e.target.files));
+        window.addEventListener('dragover', (e) => e.preventDefault());
+        window.addEventListener('drop', (e) => e.preventDefault());
+
+        dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragover'); });
+        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            handleFiles(e.dataTransfer.files);
+        });
+
+        function handleFiles(files) {
+            if (!files.length) return;
+            const file = files[0];
+            
+            if (file.type !== 'image/png') {
+                showError("Error: File must be a valid PNG image.");
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                previewImg.src = e.target.result;
+                previewContainer.style.display = 'block';
+                
+                previewImg.onload = () => {
+                    fileDetails.innerHTML = `
+                        <span style="word-break: break-all; font-weight: 500;">${file.name}</span>
+                        <span style="opacity: 0.6; font-size: 0.8rem;">Size: ${(file.size / 1024 / 1024).toFixed(2)} MB</span>
+                        <span class="file-dimensions">Dimensions: ${previewImg.naturalWidth} × ${previewImg.naturalHeight}</span>
+                    `;
+                };
+            };
+            reader.readAsDataURL(file);
+
+            const bufferReader = new FileReader();
+            bufferReader.onload = (e) => {
+                try {
+                    parsePngMetadata(e.target.result);
+                } catch (err) {
+                    showError("An error occurred trying to parse this PNG file structure.");
+                    console.error(err);
+                }
+            };
+            bufferReader.readAsArrayBuffer(file);
+        }
+
+        function showError(msg) {
+            errorMsg.textContent = msg;
+            errorMsg.style.display = 'block';
+            metaOutput.style.display = 'none';
+            outputPlaceholder.style.display = 'block';
+        }
+
+        function parsePngMetadata(buffer) {
+            errorMsg.style.display = 'none';
+            const view = new DataView(buffer);
+            
+            if (view.getUint32(0) !== 0x89504E47) {
+                showError("Invalid file signature. This is not a standard PNG image file.");
+                return;
+            }
+
+            let offset = 8;
+            let foundMetadata = null;
+            let foundWorkflow = null;
+            let foundExtraPngInfo = null;
+
+            while (offset < buffer.byteLength) {
+                if (offset + 8 > buffer.byteLength) break;
+
+                const length = view.getUint32(offset);
+                const type = String.fromCharCode(
+                    view.getUint8(offset + 4), view.getUint8(offset + 5),
+                    view.getUint8(offset + 6), view.getUint8(offset + 7)
+                );
+
+                const dataOffset = offset + 8;
+                if (dataOffset + length + 4 > buffer.byteLength) break;
+                if (type === 'IEND') break;
+
+                if (type === 'tEXt' || type === 'iTXt') {
+                    const chunkData = new Uint8Array(buffer, dataOffset, length);
+                    let keyEnd = 0;
+                    while (keyEnd < chunkData.length && chunkData[keyEnd] !== 0) keyEnd++;
+
+                    const key = new TextDecoder('ascii').decode(chunkData.slice(0, keyEnd));
+                    let dataStart = keyEnd + 1;
+
+                    if (type === 'iTXt') {
+                        // iTXt fields: compression flag/method, language tag,
+                        // translated keyword, then the UTF-8 text payload.
+                        if (dataStart + 2 <= chunkData.length) {
+                            dataStart += 2;
+                            while (dataStart < chunkData.length && chunkData[dataStart] !== 0) dataStart++;
+                            dataStart++;
+                            while (dataStart < chunkData.length && chunkData[dataStart] !== 0) dataStart++;
+                            dataStart++;
+                        }
+                    }
+
+                    const value = new TextDecoder('utf-8').decode(chunkData.slice(dataStart));
+                    if (key === 'prompt') foundMetadata = value;
+                    else if (key === 'workflow') foundWorkflow = value;
+                    else if (key === 'extra_pnginfo') foundExtraPngInfo = value;
+                }
+
+                offset += length + 12; // length + chunk header + CRC
+            }
+
+            if (!foundMetadata) {
+                showError("No embedded ComfyUI prompt metadata found.");
+                return;
+            }
+
+            renderComfyMetadata(foundMetadata, foundWorkflow, foundExtraPngInfo);
+        }
+
+        function renderComfyMetadata(rawPromptStr, workflowStr, extraPngInfoStr) {
+            outputPlaceholder.style.display = 'none';
+            metaOutput.innerHTML = '';
+            metaOutput.style.display = 'flex';
+            metaOutput.className = 'meta-section';
+
+            let promptJson = {};
+            try {
+                promptJson = JSON.parse(rawPromptStr);
+            } catch(e) {
+                showError("Found parameter key, but failed to process raw value as valid JSON data.");
+                return;
+            }
+
+            let workflowJson = null;
+            if (workflowStr) {
+                try {
+                    workflowJson = JSON.parse(workflowStr);
+                } catch (e) {
+                    workflowJson = workflowStr;
+                }
+            }
+
+            const fullJson = { prompt: promptJson };
+            if (workflowJson !== null) fullJson.workflow = workflowJson;
+            if (extraPngInfoStr) {
+                try {
+                    fullJson.extra_pnginfo = JSON.parse(extraPngInfoStr);
+                } catch (e) {
+                    fullJson.extra_pnginfo = extraPngInfoStr;
+                }
+            }
+            currentFullJson = JSON.stringify(fullJson, null, 2);
+
+            // ComfyUI's load-workflow JSON must have nodes/links/etc. at the root.
+            // Match the reference extractor by attaching extra_pnginfo as root "extra".
+            if (workflowJson && typeof workflowJson === 'object') {
+                const loadableWorkflow = JSON.parse(JSON.stringify(workflowJson));
+                if (extraPngInfoStr) {
+                    try {
+                        loadableWorkflow.extra = JSON.parse(extraPngInfoStr);
+                    } catch (e) {
+                        loadableWorkflow.extra = extraPngInfoStr;
+                    }
+                }
+                currentWorkflowJson = JSON.stringify(loadableWorkflow, null, 2);
+            } else {
+                currentWorkflowJson = '';
+            }
+
+            let positivePrompts = [];
+            let negativePrompts = [];
+            let seeds = [];
+            let samplers = [];
+            let schedulers = [];
+            let steps = [];
+            let cfgs = [];
+            let sigmas = [];
+            let models = new Set();
+            let loras = []; 
+
+            for (const nodeId in promptJson) {
+                const node = promptJson[nodeId];
+                if (!node || !node.inputs) continue;
+                
+                const inputs = node.inputs;
+                const metaTitle = node._meta?.title || "";
+                const classType = node.class_type || "";
+
+                // Explicit extraction for Qwen2.1 structured prompt nodes (TextEncodeQwenImage21)
+                if (typeof inputs.prompt === 'string' && inputs.prompt.trim().length > 0) {
+                    const pVal = inputs.prompt.trim();
+                    if (!positivePrompts.includes(pVal)) positivePrompts.push(pVal);
+                }
+                if (typeof inputs.negative_prompt === 'string' && inputs.negative_prompt.trim().length > 0) {
+                    const nVal = inputs.negative_prompt.trim();
+                    if (!negativePrompts.includes(nVal)) negativePrompts.push(nVal);
+                }
+
+                let textVal = "";
+                if (typeof inputs.text === 'string') textVal = inputs.text.trim();
+                else if (typeof inputs.value === 'string') textVal = inputs.value.trim();
+
+                if (textVal.length > 0) {
+                    const lowText = textVal.toLowerCase();
+                    const lowTitle = metaTitle.toLowerCase();
+                    const lowClass = classType.toLowerCase();
+                    
+                    if (lowText.includes('negative') || lowText.includes('embedding:') || lowText.includes('bad quality') || lowTitle.includes('negative') || lowClass.includes('negative')) {
+                        if (!negativePrompts.includes(textVal)) negativePrompts.push(textVal);
+                    } else {
+                        if (!positivePrompts.includes(textVal)) positivePrompts.push(textVal);
+                    }
+                }
+
+                if (inputs.seed !== undefined) seeds.push(inputs.seed);
+                if (inputs.noise_seed !== undefined) seeds.push(inputs.noise_seed);
+                if (inputs.sampler_name !== undefined) samplers.push(inputs.sampler_name);
+                if (inputs.scheduler !== undefined) schedulers.push(inputs.scheduler);
+                if (inputs.steps !== undefined) steps.push(inputs.steps);
+                if (inputs.cfg !== undefined) cfgs.push(inputs.cfg);
+                
+                // Parsing manual sigma schedules (ManualSigmas)
+                if (typeof inputs.sigmas === 'string' && inputs.sigmas.trim().length > 0) {
+                    sigmas.push(inputs.sigmas.trim());
+                }
+
+                // Expanded model keys covering Checkpoints, UNETs, Clips, and VAEs
+                [
+                    'ckpt_name', 'model_name', 'vae_name', 'unet_name', 
+                    'clip_name', 'diffusion_model_name', 'transformer_name', 'text_encoder_name'
+                ].forEach(key => {
+                    if (typeof inputs[key] === 'string' && inputs[key] !== "None" && inputs[key].trim() !== "") {
+                        models.add(inputs[key]);
+                    }
+                });
+
+                if (typeof inputs['lora_name'] === 'string') {
+                    const strength = inputs['strength_model'] !== undefined ? inputs['strength_model'] : 1;
+                    loras.push({ name: inputs['lora_name'], strength: strength });
+                }
+
+                if (classType === "Lora Loader Stack (rgthree)") {
+                    for (let i = 1; i <= 20; i++) {
+                        const numStr = i.toString().padStart(2, '0');
+                        const loraKey = `lora_${numStr}`;
+                        const strengthKey = `strength_${numStr}`;
+                        
+                        if (inputs[loraKey] !== undefined && typeof inputs[loraKey] === 'string') {
+                            const loraValue = inputs[loraKey];
+                            if (loraValue !== "None" && loraValue.trim() !== "") {
+                                const strengthVal = inputs[strengthKey] !== undefined ? inputs[strengthKey] : 1;
+                                loras.push({ name: loraValue, strength: strengthVal });
+                            }
+                        }
+                    }
+                }
+            }
+
+            let html = '';
+
+            if (positivePrompts.length > 0) {
+                html += `<div>
+                    <div class="group-title">Positive Prompt</div>
+                    <div class="prompt-card">
+                        <div class="prompt-text" id="pos-prompt">${escapeHtml(positivePrompts.join('\n\n'))}</div>
+                        <button class="btn-copy" onclick="copyText('pos-prompt', this)">Copy Prompt</button>
+                    </div>
+                </div>`;
+            }
+
+            if (negativePrompts.length > 0) {
+                html += `<div>
+                    <div class="group-title">Negative Prompt</div>
+                    <div class="prompt-card">
+                        <div class="prompt-text" id="neg-prompt">${escapeHtml(negativePrompts.join('\n\n'))}</div>
+                        <button class="btn-copy" onclick="copyText('neg-prompt', this)">Copy Negative</button>
+                    </div>
+                </div>`;
+            }
+
+            html += `<div><div class="group-title">Generation Settings</div><div class="grid-settings">`;
+            if (steps.length > 0) {
+                html += `<div class="setting-item"><span class="setting-label">Steps:</span><span class="setting-value">${steps[0]}</span></div>`;
+            }
+            if (cfgs.length > 0) {
+                html += `<div class="setting-item"><span class="setting-label">CFG Scale:</span><span class="setting-value">${cfgs[0]}</span></div>`;
+            }
+            if (samplers.length > 0) {
+                html += `<div class="setting-item"><span class="setting-label">Sampler:</span><span class="setting-value">${samplers[0]}</span></div>`;
+            }
+            if (schedulers.length > 0) {
+                html += `<div class="setting-item"><span class="setting-label">Scheduler:</span><span class="setting-value">${schedulers[0]}</span></div>`;
+            }
+            
+            // Display manual/custom sequence sigmas right inside the generation setting panel
+            if (sigmas.length > 0) {
+                html += `<div class="setting-item full-width"><span class="setting-label">Sigmas:</span><span class="setting-value" style="font-size: 0.8rem; font-family: monospace; word-break: break-all;">${escapeHtml(sigmas[0])}</span></div>`;
+            }
+
+            if (seeds.length > 0) {
+                html += `<div class="setting-item full-width">
+                    <div class="seed-wrapper">
+                        <span class="setting-label">Seed:</span>
+                        <span class="setting-value" id="seed-val">${seeds[0]}</span>
+                    </div>
+                    <button class="inline-btn-copy" onclick="copyInlineText('seed-val', this)">Copy Seed</button>
+                </div>`;
+            }
+            html += `</div></div>`;
+
+            if (models.size > 0) {
+                html += `<div>
+                    <div class="group-title">Detected Node Models</div>
+                    <div>${Array.from(models).map(m => `<span class="model-tag">${escapeHtml(m)}</span>`).join('')}</div>
+                </div>`;
+            }
+
+            if (loras.length > 0) {
+                html += `<div>
+                    <div class="group-title">Active LoRAs (${loras.length})</div>
+                    <div class="lora-container">`;
+                loras.forEach(lora => {
+                    html += `<div class="lora-item">
+                        <span class="lora-name">${escapeHtml(lora.name)}</span>
+                        <span class="lora-strength">Multiplier: ${lora.strength}</span>
+                    </div>`;
+                });
+                html += `</div></div>`;
+            }
+
+            html += `<div>
+                <div class="group-title" style="color: var(--warning);">Raw JSON Prompt View Backup</div>
+                <div class="prompt-card" style="padding: 0; border: none;">
+                    <div class="raw-box" id="raw-json-data">${escapeHtml(JSON.stringify(promptJson, null, 2))}</div>
+                    <div class="copy-button-group">
+                        <button class="btn-copy" onclick="copyText('raw-json-data', this)">Copy Raw JSON</button>
+                        <button class="btn-copy" onclick="copyFullJson(this)">Copy Full JSON (Raw + Workflow)</button>
+                        <button class="btn-copy" onclick="copyWorkflowJson(this)">Copy Loadable Workflow JSON</button>
+                    </div>
+                </div>
+            </div>`;
+
+            metaOutput.innerHTML = html;
+        }
+
+        function copyText(elementId, btn) {
+            const text = document.getElementById(elementId).innerText;
+            navigator.clipboard.writeText(text).then(() => {
+                const origText = btn.innerText;
+                btn.innerText = "Copied!";
+                btn.classList.add('copied');
+                setTimeout(() => {
+                    btn.innerText = origText;
+                    btn.classList.remove('copied');
+                }, 1500);
+            });
+        }
+
+        function copyFullJson(btn) {
+            navigator.clipboard.writeText(currentFullJson).then(() => {
+                const origText = btn.innerText;
+                btn.innerText = "Copied!";
+                btn.classList.add('copied');
+                setTimeout(() => {
+                    btn.innerText = origText;
+                    btn.classList.remove('copied');
+                }, 1500);
+            });
+        }
+
+        function copyWorkflowJson(btn) {
+            if (!currentWorkflowJson) {
+                showError("No valid workflow JSON chunk was found in this PNG.");
+                return;
+            }
+            navigator.clipboard.writeText(currentWorkflowJson).then(() => {
+                const origText = btn.innerText;
+                btn.innerText = "Copied!";
+                btn.classList.add('copied');
+                setTimeout(() => {
+                    btn.innerText = origText;
+                    btn.classList.remove('copied');
+                }, 1500);
+            });
+        }
+
+        function copyInlineText(elementId, btn) {
+            const text = document.getElementById(elementId).innerText;
+            navigator.clipboard.writeText(text).then(() => {
+                const origText = btn.innerText;
+                btn.innerText = "Copied!";
+                btn.classList.add('copied');
+                setTimeout(() => {
+                    btn.innerText = origText;
+                    btn.classList.remove('copied');
+                }, 1500);
+            });
+        }
+
+        if (typeof escapeHtml !== 'function') {
+            function escapeHtml(str) {
+                return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+            }
+        }
+    </script>
+</body>
+</html>
